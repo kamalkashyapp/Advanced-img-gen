@@ -1,5 +1,5 @@
 {
-  "dependencies": {
-    "node-fetch": "3.3.2"
-  }
+  "name": "advanced-img-gen",
+  "version": "1.0.0",
+  "dependencies": {}
 }
