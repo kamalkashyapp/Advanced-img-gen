@@ -3,7 +3,7 @@ export default async function handler(req, res) {
     const img = req.query.img;
 
     if (!img) {
-      return res.status(400).json({ error: "img query missing" });
+      return res.status(400).json({ error: "img parameter missing" });
     }
 
     const apiURL = `https://nsfw.drsudo.workers.dev/?img=${encodeURIComponent(img)}`;
@@ -11,16 +11,16 @@ export default async function handler(req, res) {
     const response = await fetch(apiURL);
 
     if (!response.ok) {
-      return res.status(500).json({ error: "Third-party API error" });
+      return res.status(500).json({ error: "Source API error" });
     }
 
-    const data = await response.text(); // API returns text, not JSON
+    // API returns JSON/text, not binary
+    const result = await response.text();
 
-    // Pass-through response
     res.setHeader("Content-Type", "application/json");
-    return res.status(200).send(data);
+    return res.status(200).send(result);
 
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
-      }
+}
