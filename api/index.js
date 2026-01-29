@@ -8,6 +8,10 @@ const HEADERS = {
   "Content-Type": "application/x-www-form-urlencoded",
 };
 
+// sleep helper
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// 1️⃣ Create Image Task
 async function createImage(prompt, size = "1024*1024", model = "flux-dev") {
   const payload = new URLSearchParams({
     prompt,
@@ -17,25 +21,72 @@ async function createImage(prompt, size = "1024*1024", model = "flux-dev") {
     image_name: `img_${Date.now()}`,
   });
 
-  const res = await fetch(API_URL, { method: "POST", headers: HEADERS, body: payload });
-  const data = await res.json();
+  const response = await fetch(API_URL, {
+    method: "POST",
+    headers: HEADERS,
+    body: payload,
+  });
+
+  const data = await response.json();
   return data.task_id || null;
+}
+
+// 2️⃣ Check Task Status
+async function checkStatus(taskId) {
+  const payload = new URLSearchParams({ task_id: taskId });
+
+  const response = await fetch(API_URL, {
+    method: "POST",
+    headers: HEADERS,
+    body: payload,
+  });
+
+  return response.json();
+}
+
+// 3️⃣ Generate & Wait Until Done
+async function generateImageAndWait(prompt) {
+  const taskId = await createImage(prompt);
+
+  if (!taskId) {
+    return { ok: false, error: "Task creation failed" };
+  }
+
+  // Poll until done or failed
+  while (true) {
+    // Wait a bit before checking
+    await sleep(2000);
+
+    const status = await checkStatus(taskId);
+
+    if (status.task_status === "SUCCEEDED") {
+      const imageUrl = status.result.data[0].url;
+      return { ok: true, image_url: imageUrl, task_id: taskId };
+    }
+
+    if (status.task_status === "FAILED") {
+      return { ok: false, error: "Image generation failed" };
+    }
+
+    // else continue polling
+  }
 }
 
 export default async function handler(req, res) {
   try {
     const { prompt } = req.query;
-    if (!prompt) return res.status(400).json({ ok: false, error: "Missing ?prompt parameter" });
 
-    const taskId = await createImage(prompt);
-    if (!taskId) return res.status(500).json({ ok: false, error: "Task creation failed" });
+    if (!prompt) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "Missing ?prompt parameter" });
+    }
 
-    res.status(200).json({
-      ok: true,
-      task_id: taskId,
-      message: "Task created! Poll /api/status?task_id=TASK_ID to get the image.",
-    });
+    const result = await generateImageAndWait(prompt);
+    res.status(200).json(result);
   } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
+    res
+      .status(500)
+      .json({ ok: false, error: "Server error: " + err.message });
   }
 }
