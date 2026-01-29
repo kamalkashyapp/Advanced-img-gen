@@ -8,10 +8,9 @@ const HEADERS = {
   "Content-Type": "application/x-www-form-urlencoded",
 };
 
-// sleep helper
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// 1️⃣ Create Image Task
+// 1️⃣ Create image task
 async function createImage(prompt, size = "1024*1024", model = "flux-dev") {
   const payload = new URLSearchParams({
     prompt,
@@ -21,30 +20,30 @@ async function createImage(prompt, size = "1024*1024", model = "flux-dev") {
     image_name: `img_${Date.now()}`,
   });
 
-  const response = await fetch(API_URL, {
+  const res = await fetch(API_URL, {
     method: "POST",
     headers: HEADERS,
     body: payload,
   });
 
-  const data = await response.json();
+  const data = await res.json();
   return data.task_id || null;
 }
 
-// 2️⃣ Check Task Status
+// 2️⃣ Check task status
 async function checkStatus(taskId) {
   const payload = new URLSearchParams({ task_id: taskId });
 
-  const response = await fetch(API_URL, {
+  const res = await fetch(API_URL, {
     method: "POST",
     headers: HEADERS,
     body: payload,
   });
 
-  return response.json();
+  return res.json();
 }
 
-// 3️⃣ Generate & Wait Until Done
+// 3️⃣ Full generation flow (wait for image)
 async function generateImageAndWait(prompt) {
   const taskId = await createImage(prompt);
 
@@ -52,23 +51,24 @@ async function generateImageAndWait(prompt) {
     return { ok: false, error: "Task creation failed" };
   }
 
-  // Poll until done or failed
   while (true) {
-    // Wait a bit before checking
     await sleep(2000);
-
     const status = await checkStatus(taskId);
 
     if (status.task_status === "SUCCEEDED") {
       const imageUrl = status.result.data[0].url;
-      return { ok: true, image_url: imageUrl, task_id: taskId };
+
+      // ✅ Return in the exact order you wanted
+      return {
+        ok: true,
+        image_url: imageUrl,
+        task_id: taskId,
+      };
     }
 
     if (status.task_status === "FAILED") {
       return { ok: false, error: "Image generation failed" };
     }
-
-    // else continue polling
   }
 }
 
